@@ -19,32 +19,35 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+
     - name: Build Debug APK
+      shell: bash
       run: |
         chmod +x gradlew
-        ./gradlew assembleDebug --no-daemon --stacktrace --info
+        ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
 
     - name: List build outputs
       if: always()
       run: |
         echo "=== Find all APK files ==="
         find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
-        echo "=== Build outputs directory ==="
-        ls -la app/build/outputs/ 2>/dev/null || echo "No outputs directory"
-        ls -laR app/build/outputs/apk/ 2>/dev/null || echo "No APK directory"
+        echo "=== Build outputs ==="
+        ls -laR app/build/outputs/ 2>/dev/null || echo "No outputs directory"
+        echo "=== Gradle version ==="
+        ./gradlew --version 2>/dev/null || echo "Gradle not available"
 
-    - name: Upload Build Log on Failure
-      if: failure()
+    - name: Upload Build Log
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: build-log
         path: build.log
+        if-no-files-found: warn
 
     - name: Upload APK
       if: always()
@@ -52,3 +55,4 @@ jobs:
       with:
         name: HardwareInfoPro-APK
         path: "**/*.apk"
+        if-no-files-found: warn
