@@ -13,6 +13,7 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.nfc.NfcManager
 import android.os.BatteryManager
@@ -30,7 +31,7 @@ import java.util.Locale
 /**
  * 硬件信息采集管理器 - 采集设备所有可获取的硬件信息
  */
-@SuppressLint("HardwareIds")
+@SuppressLint("HardwareIds", "MissingPermission")
 class HardwareInfoManager(private val context: Context) {
 
     fun collectAllInfo(): List<InfoSection> {
@@ -1046,6 +1047,7 @@ class HardwareInfoManager(private val context: Context) {
     }
 
     // ==================== NFC 信息 ====================
+    @Suppress("DEPRECATION")
     private fun getNfcInfo(): List<InfoItem> {
         val items = mutableListOf<InfoItem>()
         val hasNfc = context.packageManager.hasSystemFeature(PackageManager.FEATURE_NFC)
@@ -1056,7 +1058,8 @@ class HardwareInfoManager(private val context: Context) {
             val adapter = nfcManager?.defaultAdapter
             items.add(InfoItem("NFC 状态", if (adapter?.isEnabled == true) "已开启" else "已关闭"))
             items.add(InfoItem("NFC HCE", if (context.packageManager.hasSystemFeature(PackageManager.FEATURE_NFC_HOST_CARD_EMULATION)) "支持" else "不支持"))
-            items.add(InfoItem("NFC Beam", if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && adapter?.isNdefPushEnabled == true) "已开启" else "不支持/已关闭"))
+            val beamEnabled = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) { try { adapter?.isNdefPushEnabled == true } catch (e: Exception) { false } } else false
+            items.add(InfoItem("NFC Beam", if (beamEnabled) "已开启" else "不支持/已关闭"))
         }
         return items
     }
