@@ -25,21 +25,49 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
+    - name: Environment Check
+      run: |
+        echo "### Environment Check" >> $GITHUB_STEP_SUMMARY
+        echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_STEP_SUMMARY
+        echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_STEP_SUMMARY
+        echo "PATH=$PATH" >> $GITHUB_STEP_SUMMARY
+        java -version 2>&1 || echo "Java not found"
+        echo "---"
+        echo "gradlew exists: $(test -f gradlew && echo yes || echo no)"
+        echo "gradlew permissions: $(ls -la gradlew 2>/dev/null)"
+        echo "gradle-wrapper.jar exists: $(test -f gradle/wrapper/gradle-wrapper.jar && echo yes || echo no)"
+        echo "gradle-wrapper.jar size: $(stat -c %s gradle/wrapper/gradle-wrapper.jar 2>/dev/null || echo 'N/A')"
+        echo "Project files:"
+        find . -maxdepth 3 -type f -name "*.gradle" -o -name "*.xml" -o -name "*.kt" -o -name "*.properties" | head -30
+
     - name: Build Debug APK
       shell: bash
       run: |
         chmod +x gradlew
         ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+      continue-on-error: true
 
-    - name: List build outputs
+    - name: Report Build Result
       if: always()
       run: |
-        echo "=== Find all APK files ==="
-        find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
-        echo "=== Build outputs ==="
-        ls -laR app/build/outputs/ 2>/dev/null || echo "No outputs directory"
-        echo "=== Gradle version ==="
-        ./gradlew --version 2>/dev/null || echo "Gradle not available"
+        echo "### Build Result" >> $GITHUB_STEP_SUMMARY
+        
+        echo "#### Build Log (last 200 lines)" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        tail -200 build.log >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No build.log" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "#### APK Files Found" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        find . -name "*.apk" -type f >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No APK files" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "#### Build Outputs" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        ls -laR app/build/outputs/ >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No outputs dir" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
 
     - name: Upload Build Log
       if: always()
