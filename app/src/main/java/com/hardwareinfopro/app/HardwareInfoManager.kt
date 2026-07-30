@@ -109,7 +109,12 @@ class HardwareInfoManager(private val context: Context) {
     private fun getGlEsVersion(): String {
         return try {
             val pm = context.packageManager
-            pm.systemAvailableFeatures.firstOrNull { it.isGLFeature }?.glEsVersion ?: "未知"
+            val glFeature = pm.systemAvailableFeatures.firstOrNull { it.name == null }
+            if (glFeature != null) {
+                val major = (glFeature.reqGlEsVersion and 0xffff0000.toInt()) shr 16
+                val minor = glFeature.reqGlEsVersion and 0x0000ffff
+                "OpenGL ES $major.$minor"
+            } else "未知"
         } catch (e: Exception) {
             "未知"
         }
@@ -701,11 +706,11 @@ class HardwareInfoManager(private val context: Context) {
             // WiFi 标准
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 val wifiStandard = when (wifiInfo.wifiStandard) {
-                    android.net.wifi.WifiInfo.WIFI_STANDARD_LEGACY -> "802.11a/b/g (Legacy)"
-                    android.net.wifi.WifiInfo.WIFI_STANDARD_11N -> "802.11n (WiFi 4)"
-                    android.net.wifi.WifiInfo.WIFI_STANDARD_11AC -> "802.11ac (WiFi 5)"
-                    android.net.wifi.WifiInfo.WIFI_STANDARD_11AX -> "802.11ax (WiFi 6)"
-                    android.net.wifi.WifiInfo.WIFI_STANDARD_11BE -> "802.11be (WiFi 7)"
+                    1 -> "802.11a/b/g (Legacy)"
+                    4 -> "802.11n (WiFi 4)"
+                    5 -> "802.11ac (WiFi 5)"
+                    6 -> "802.11ax (WiFi 6)"
+                    7 -> "802.11be (WiFi 7)"
                     else -> "未知"
                 }
                 items.add(InfoItem("WiFi 标准", wifiStandard))
@@ -1058,7 +1063,7 @@ class HardwareInfoManager(private val context: Context) {
             val adapter = nfcManager?.defaultAdapter
             items.add(InfoItem("NFC 状态", if (adapter?.isEnabled == true) "已开启" else "已关闭"))
             items.add(InfoItem("NFC HCE", if (context.packageManager.hasSystemFeature(PackageManager.FEATURE_NFC_HOST_CARD_EMULATION)) "支持" else "不支持"))
-            val beamEnabled = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) { try { adapter?.isNdefPushEnabled == true } catch (e: Exception) { false } } else false
+            val beamEnabled = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) { try { adapter?.javaClass?.getMethod("isNdefPushEnabled")?.invoke(adapter) == true } catch (e: Exception) { false } } else false
             items.add(InfoItem("NFC Beam", if (beamEnabled) "已开启" else "不支持/已关闭"))
         }
         return items

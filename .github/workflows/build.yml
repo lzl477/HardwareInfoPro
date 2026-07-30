@@ -30,62 +30,9 @@ jobs:
       uses: gradle/actions/setup-gradle@v3
 
     - name: Build Debug APK
-      id: build
-      continue-on-error: true
       run: |
         chmod +x gradlew
-        
-        echo "=== Testing gradlew ==="
-        ./gradlew --version 2>&1 || echo "gradlew --version FAILED"
-        
-        echo "=== Building ==="
-        ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 || true
-        
-        echo "=== Searching for APK ==="
-        find . -name "*.apk" -type f 2>/dev/null || echo "NO APK FOUND"
-        
-        echo "=== app/build contents ==="
-        ls -laR app/build/ 2>/dev/null || echo "No app/build"
-
-    - name: Save build log to repo
-      if: always()
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        # Collect all diagnostic info
-        {
-          echo "# Build Log"
-          echo "Date: $(date -u)"
-          echo "SHA: ${{ github.sha }}"
-          echo ""
-          echo "## Environment"
-          echo "JAVA_HOME=$JAVA_HOME"
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "Java version: $(java -version 2>&1)"
-          echo ""
-          echo "## Gradle wrapper test"
-          ./gradlew --version 2>&1 || echo "FAILED"
-          echo ""
-          echo "## Build attempt"
-          ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 || echo "BUILD FAILED"
-          echo ""
-          echo "## APK search"
-          find . -name "*.apk" -type f 2>/dev/null || echo "No APK files"
-          echo ""
-          echo "## app/build directory"
-          ls -laR app/build/ 2>/dev/null || echo "No app/build directory"
-          echo ""
-          echo "## Project structure"
-          find . -maxdepth 4 -type f \( -name "*.gradle" -o -name "*.properties" -o -name "*.xml" -o -name "*.kt" \) | sort
-        } > /tmp/build-diagnostic.log
-        
-        # Commit the log file to the repo
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        cp /tmp/build-diagnostic.log build-diagnostic.log
-        git add build-diagnostic.log
-        git commit -m "Update build diagnostic log [skip ci]" || echo "Nothing to commit"
-        git push origin main || echo "Push failed"
+        ./gradlew assembleDebug --no-daemon --stacktrace
 
     - name: Create Release with APK
       if: success()
@@ -94,8 +41,11 @@ jobs:
       run: |
         APK_FILE=$(find . -name "*.apk" -type f | head -1)
         if [ -n "$APK_FILE" ]; then
+          echo "Found APK: $APK_FILE"
           TAG="v$(date +%Y%m%d%H%M%S)"
-          gh release create "$TAG" "$APK_FILE" --title "HardwareInfoPro $TAG" --notes "Auto-built APK"
+          gh release create "$TAG" "$APK_FILE" --title "HardwareInfoPro $TAG" --notes "Auto-built APK from commit ${{ github.sha }}"
+          echo "Release created: $TAG"
         else
-          echo "No APK found, skipping release"
+          echo "ERROR: No APK file found!"
+          exit 1
         fi
