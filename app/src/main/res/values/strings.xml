@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">硬件信息大师</string>
+    <string name="refresh">刷新</string>
+    <string name="loading">加载中…</string>
+    <string name="cpu_info">处理器 (CPU)</string>
+    <string name="battery_info">电池信息</string>
+    <string name="usb_info">USB 信息</string>
+    <string name="sensor_info">传感器</string>
+    <string name="gpu_info">图形处理器 (GPU)</string>
+    <string name="memory_info">内存与存储</string>
+    <string name="wifi_info">无线网络 (WiFi)</string>
+    <string name="screen_info">屏幕显示</string>
+    <string name="system_info">系统信息</string>
+    <string name="camera_info">摄像头</string>
+    <string name="audio_info">音频</string>
+    <string name="network_info">移动网络</string>
+    <string name="bluetooth_info">蓝牙</string>
+    <string name="nfc_info">NFC</string>
+    <string name="unknown">未知</string>
+    <string name="not_available">不可用</string>
+    <string name="permission_needed">需要权限</string>
+</resources>
