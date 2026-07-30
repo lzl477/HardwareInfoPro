@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout code
@@ -22,51 +24,42 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Install Gradle 8.2
-      run: |
-        wget -q https://services.gradle.org/distributions/gradle-8.2-bin.zip -O /tmp/gradle.zip
-        unzip -q /tmp/gradle.zip -d /opt/
-        echo "/opt/gradle-8.2/bin" >> $GITHUB_PATH
-        gradle --version
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
 
-    - name: Build APK with direct Gradle
+    - name: Build Debug APK
       run: |
-        echo "## Build Environment" >> $GITHUB_STEP_SUMMARY
-        echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_STEP_SUMMARY
-        echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_STEP_SUMMARY
-        echo "Gradle: $(which gradle)" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
+        chmod +x gradlew
         
-        echo "Running gradle assembleDebug..."
-        gradle assembleDebug --no-daemon --stacktrace --project-dir=. 2>&1 | tee build.log
+        echo "=== Gradle wrapper test ==="
+        ./gradlew --version 2>&1 || echo "gradlew --version failed"
         
-        echo "## Build Result" >> $GITHUB_STEP_SUMMARY
-        echo "Exit code: $?" >> $GITHUB_STEP_SUMMARY
+        echo "=== Running build ==="
+        ./gradlew assembleDebug --no-daemon --stacktrace 2>&1
+        
+        echo "=== Build complete ==="
+        echo "Exit code: $?"
+        
+        echo "=== Find APK files ==="
+        find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
+        
+        echo "=== App build directory ==="
+        ls -laR app/build/ 2>/dev/null || echo "No app/build directory"
+        
+        echo "=== Root build directory ==="
+        ls -la build/ 2>/dev/null || echo "No root build directory"
 
-    - name: Check Outputs
-      if: always()
+    - name: Create Release with APK
+      if: success()
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
-        echo "## Output Check" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        echo "APK files:" >> $GITHUB_STEP_SUMMARY
-        find . -name "*.apk" -type f 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "None" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "Build dir:" >> $GITHUB_STEP_SUMMARY
-        ls -laR app/build/ 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "No build dir" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-
-    - name: Upload Build Log
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-log
-        path: build.log
-        if-no-files-found: warn
-
-    - name: Upload APK
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: HardwareInfoPro-APK
-        path: "**/*.apk"
-        if-no-files-found: warn
+        APK_FILE=$(find . -name "*.apk" -type f | head -1)
+        if [ -n "$APK_FILE" ]; then
+          echo "Found APK: $APK_FILE"
+          TAG="v$(date +%Y%m%d%H%M%S)"
+          gh release create "$TAG" "$APK_FILE" --title "HardwareInfoPro $TAG" --notes "Auto-built APK from commit ${{ github.sha }}"
+          echo "Release created: $TAG"
+        else
+          echo "No APK file found!"
+        fi
