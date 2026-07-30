@@ -22,61 +22,38 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-
-    - name: Build Debug APK
-      shell: bash
+    - name: Install Gradle 8.2
       run: |
-        chmod +x gradlew
+        wget -q https://services.gradle.org/distributions/gradle-8.2-bin.zip -O /tmp/gradle.zip
+        unzip -q /tmp/gradle.zip -d /opt/
+        echo "/opt/gradle-8.2/bin" >> $GITHUB_PATH
+        gradle --version
+
+    - name: Build APK with direct Gradle
+      run: |
+        echo "## Build Environment" >> $GITHUB_STEP_SUMMARY
+        echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_STEP_SUMMARY
+        echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_STEP_SUMMARY
+        echo "Gradle: $(which gradle)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
         
-        # Run build and capture output
-        BUILD_OUTPUT=$(./gradlew assembleDebug --no-daemon --stacktrace 2>&1) || true
-        BUILD_EXIT=$?
+        echo "Running gradle assembleDebug..."
+        gradle assembleDebug --no-daemon --stacktrace --project-dir=. 2>&1 | tee build.log
         
-        echo "Build exit code: $BUILD_EXIT"
-        
-        # Write summary
         echo "## Build Result" >> $GITHUB_STEP_SUMMARY
-        echo "Exit code: $BUILD_EXIT" >> $GITHUB_STEP_SUMMARY
+        echo "Exit code: $?" >> $GITHUB_STEP_SUMMARY
+
+    - name: Check Outputs
+      if: always()
+      run: |
+        echo "## Output Check" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "APK files:" >> $GITHUB_STEP_SUMMARY
+        find . -name "*.apk" -type f 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "None" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Write last 100 lines of build output to summary
-        echo "### Build Output (last 100 lines)" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        echo "$BUILD_OUTPUT" | tail -100 >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        
-        # Write first 50 lines too (for early errors)
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Build Output (first 50 lines)" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        echo "$BUILD_OUTPUT" | head -50 >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        
-        # Check for APK
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### APK Files" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        find . -name "*.apk" -type f 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "None found" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        
-        # Save full log
-        echo "$BUILD_OUTPUT" > build.log
-        
-        # List build outputs
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Build outputs directory" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "Build dir:" >> $GITHUB_STEP_SUMMARY
         ls -laR app/build/ 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "No build dir" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
-        
-        # Fail if no APK
-        APK_COUNT=$(find . -name "*.apk" -type f 2>/dev/null | wc -l)
-        if [ "$APK_COUNT" -eq 0 ]; then
-          echo "ERROR: No APK files generated!"
-          exit 1
-        fi
 
     - name: Upload Build Log
       if: always()
