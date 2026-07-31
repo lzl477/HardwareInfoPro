@@ -1,11 +1,15 @@
 package com.hardwareinfopro.app
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -22,6 +26,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var hardwareInfoManager: HardwareInfoManager
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    // 自动刷新配置
+    private val refreshIntervals = arrayOf(0, 1, 2, 5, 10, 30, 60)
+    private val refreshIntervalLabels = arrayOf("关闭", "1秒", "2秒", "5秒", "10秒", "30秒", "1分钟")
+    private var currentIntervalIndex = 0
+    private var autoRefreshJob: Job? = null
+
     // 权限请求
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -36,9 +46,11 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         hardwareInfoManager = HardwareInfoManager(this)
+        loadRefreshSettings()
         setupUI()
         requestPermissions()
         loadHardwareInfo()
+        startAutoRefresh()
     }
 
     private fun setupUI() {
@@ -64,6 +76,12 @@ class MainActivity : AppCompatActivity() {
         // FAB 刷新按钮
         binding.fabRefresh.setOnClickListener {
             loadHardwareInfo()
+        }
+
+        // FAB 长按打开刷新间隔设置
+        binding.fabRefresh.setOnLongClickListener {
+            showRefreshIntervalDialog()
+            true
         }
 
         // 状态栏
@@ -117,5 +135,49 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         coroutineScope.cancel()
+    }
+
+    // ==================== 自动刷新设置 ====================
+
+    private fun loadRefreshSettings() {
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val interval = prefs.getInt("refresh_interval", 0)
+        currentIntervalIndex = refreshIntervals.indexOf(interval).coerceAtLeast(0)
+    }
+
+    private fun saveRefreshSettings() {
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        prefs.edit().putInt("refresh_interval", refreshIntervals[currentIntervalIndex]).apply()
+    }
+
+    private fun startAutoRefresh() {
+        autoRefreshJob?.cancel()
+        val interval = refreshIntervals[currentIntervalIndex]
+        if (interval > 0) {
+            autoRefreshJob = coroutineScope.launch {
+                while (isActive) {
+                    delay(interval * 1000L)
+                    loadHardwareInfo()
+                }
+            }
+        }
+    }
+
+    private fun showRefreshIntervalDialog() {
+        AlertDialog.Builder(this, R.style.Theme_HardwareInfoPro)
+            .setTitle("自动刷新间隔")
+            .setSingleChoiceItems(
+                refreshIntervalLabels,
+                currentIntervalIndex
+            ) { dialog, which ->
+                currentIntervalIndex = which
+                saveRefreshSettings()
+                startAutoRefresh()
+                dialog.dismiss()
+                val label = refreshIntervalLabels[which]
+                Toast.makeText(this, "刷新间隔: $label", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 }
